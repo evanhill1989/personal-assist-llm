@@ -18,7 +18,7 @@ export type DisplayMessage = {
 export type StreamEvent =
   | { type: 'text_delta'; text: string }
   | { type: 'tool_start'; name: string; tool_use_id: string }
-  | { type: 'tool_end'; name: string; tool_use_id: string; result: Record<string, unknown> }
+  | { type: 'tool_end'; name: string; tool_use_id: string; result: object }
   | { type: 'final_messages'; messages: MessageParam[] }
   | { type: 'done' }
   | { type: 'error'; message: string }

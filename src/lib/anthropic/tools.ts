@@ -268,7 +268,7 @@ export async function dispatchTool(
   input: Record<string, unknown>,
   supabase: SupabaseClient,
   userId: string,
-): Promise<Record<string, unknown>> {
+): Promise<object> {
   try {
     switch (toolName) {
       case "create_task":
