@@ -64,6 +64,43 @@ personal-assist/
 
 ---
 
+## Streaming Architecture
+
+The route handler returns a **Server-Sent Events (SSE) stream** (`Content-Type: text/event-stream`) using the Web Streams API. No third-party streaming library — just `new ReadableStream` → `new Response(stream)`.
+
+### Agentic loop with streaming
+
+The Anthropic SDK's `.stream()` call emits events as tokens arrive. The challenge is that tool use breaks the stream: Claude stops generating text, calls a tool, waits for the result, then continues. The loop looks like this:
+
+```
+1. Open SSE stream to client
+2. Call anthropic.messages.stream() — forward text_delta events to client as they arrive
+3. Stream ends with stop_reason: "tool_use"
+4. Emit a tool_start event to client (triggers ToolCallIndicator)
+5. Execute tool(s) against Supabase
+6. Emit tool_end event to client
+7. Call anthropic.messages.stream() again with tool_result appended — repeat from step 2
+8. Stream ends with stop_reason: "end_turn" — emit done event, close stream
+```
+
+### SSE event format (NDJSON lines)
+
+Each event is a JSON object on a single line, prefixed with `data: `:
+
+| Event type | Shape | When |
+|---|---|---|
+| `text_delta` | `{ type: "text_delta", text: "..." }` | Each token |
+| `tool_start` | `{ type: "tool_start", name: "create_task" }` | Tool call begins |
+| `tool_end` | `{ type: "tool_end", name: "create_task", result: {...} }` | Tool call completes |
+| `done` | `{ type: "done" }` | Stream complete |
+| `error` | `{ type: "error", message: "..." }` | Unrecoverable error |
+
+### Client-side consumption
+
+`ChatWindow.tsx` reads the stream with `response.body.getReader()`, parsing each `data: ...` line. Text deltas are appended to the in-progress assistant message. `tool_start` / `tool_end` events drive `ToolCallIndicator` visibility. On `done`, the message is finalized.
+
+---
+
 ## Key Boundaries
 
 | Layer                        | What lives here                                              | What must NOT be here                        |

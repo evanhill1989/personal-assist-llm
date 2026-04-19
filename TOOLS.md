@@ -116,7 +116,7 @@ Update or complete an existing task.
 ```typescript
 {
   name: "update_task",
-  description: "Update a task's fields or mark it complete. Use when the user says a task is done, wants to change a due date, reprioritize, or add notes.",
+  description: "Call list_tasks first if you don't have the task_id.Update a task's fields or mark it complete. Use when the user says a task is done, wants to change a due date, reprioritize, or add notes.",
   input_schema: {
     type: "object",
     properties: {
@@ -206,7 +206,7 @@ Search saved notes by keyword or tag.
 ```typescript
 {
   name: "search_notes",
-  description: "Search through saved notes. Use when the user asks to recall something, find what they wrote about a topic, or look up past decisions or meeting notes.",
+  description: "Search through saved notes. Use when the user asks to recall something, find what they wrote about a topic, or look up past decisions or meeting notes.Always provide at least one filter.",
   input_schema: {
     type: "object",
     properties: {
@@ -338,7 +338,72 @@ Update the user's stored personal context (priorities, standing instructions, et
 | `contacts`     | `id` (uuid) | `name`, `email`, `relationship`, `company`, `notes`, `last_contacted`                             |
 | `user_context` | `id` (uuid) | `field` (unique), `value`, `updated_at`                                                           |
 
-All tables will have `user_id` if auth is added later. For solo use, this can be omitted initially.
+All tables include a `user_id` (uuid) column. For solo use, hardcode a single UUID (generate it once with `gen_random_uuid()`) as a server-side constant — never pass it through tool inputs. This makes adding RLS or multi-user auth later a schema change, not a rewrite.
+
+---
+
+### 8. `delete_task`
+
+Permanently delete a task by ID.
+
+```typescript
+{
+  name: "delete_task",
+  description: "Delete a task. Use only when the user explicitly asks to remove or delete a task (not just mark it complete). Call list_tasks first if you don't have the task_id.",
+  input_schema: {
+    type: "object",
+    properties: {
+      task_id: {
+        type: "string",
+        description: "UUID of the task to delete"
+      }
+    },
+    required: ["task_id"]
+  }
+}
+```
+
+**Supabase table:** `tasks`
+**Returns:** Confirmation with deleted task title, or structured error if not found
+
+---
+
+### 9. `delete_note`
+
+Permanently delete a note by ID.
+
+```typescript
+{
+  name: "delete_note",
+  description: "Delete a note. Use only when the user explicitly asks to remove or delete a note. Call search_notes first if you don't have the note_id.",
+  input_schema: {
+    type: "object",
+    properties: {
+      note_id: {
+        type: "string",
+        description: "UUID of the note to delete"
+      }
+    },
+    required: ["note_id"]
+  }
+}
+```
+
+**Supabase table:** `notes`
+**Returns:** Confirmation with deleted note title, or structured error if not found
+
+---
+
+## Proposed Supabase Tables (Summary)
+
+| Table          | Primary Key | Key Columns                                                                                       |
+| -------------- | ----------- | ------------------------------------------------------------------------------------------------- |
+| `tasks`        | `id` (uuid) | `user_id`, `title`, `description`, `status`, `priority`, `due_date`, `project`, `contact_name`, `created_at` |
+| `notes`        | `id` (uuid) | `user_id`, `title`, `body`, `tags` (text[]), `related_project`, `contact_name`, `created_at`                 |
+| `contacts`     | `id` (uuid) | `user_id`, `name`, `email`, `relationship`, `company`, `notes`, `last_contacted`                             |
+| `user_context` | `id` (uuid) | `user_id`, `field` (unique), `value`, `updated_at`                                                           |
+
+All tables include a `user_id` (uuid) column. For solo use, hardcode a single UUID (generate once with `gen_random_uuid()`) as a server-side constant — never pass through tool inputs. Enables RLS and multi-user auth later without a rewrite.
 
 ---
 
@@ -349,3 +414,4 @@ All tables will have `user_id` if auth is added later. For solo use, this can be
 - Each handler receives `input` (the validated tool input) and the Supabase server client
 - Handlers return a plain object; the Route Handler wraps it in a `tool_result` content block
 - Tools should be defensive: if a required record isn't found, return a structured error message rather than throwing
+- **Context source of truth:** `CONTEXT.md` is a one-time seed document. On first run, seed Supabase's `user_context` table from it. After that, all reads and writes go through Supabase only — `update_context` writes there, and `lib/context/loader.ts` reads from there. Do not read `CONTEXT.md` at runtime.
