@@ -13,6 +13,12 @@ import {
 } from "@/lib/supabase/queries/notes";
 import { upsertContact } from "@/lib/supabase/queries/contacts";
 import { updateContext } from "@/lib/supabase/queries/context";
+import {
+  createGoal,
+  listGoals,
+  updateGoal,
+  deleteGoal,
+} from "@/lib/supabase/queries/goals";
 
 export const tools: Anthropic.Tool[] = [
   {
@@ -47,6 +53,11 @@ export const tools: Anthropic.Tool[] = [
           type: "string",
           description:
             "Name of a person this task is associated with, if mentioned",
+        },
+        goal_id: {
+          type: "string",
+          description:
+            "UUID of the goal this task contributes to, if applicable",
         },
       },
       required: ["title"],
@@ -83,6 +94,10 @@ export const tools: Anthropic.Tool[] = [
           description:
             "Filter tasks associated with this person (partial match)",
         },
+        goal_id: {
+          type: "string",
+          description: "Filter tasks linked to a specific goal UUID",
+        },
         limit: {
           type: "number",
           description: "Max number of tasks to return. Defaults to 20.",
@@ -108,6 +123,11 @@ export const tools: Anthropic.Tool[] = [
         },
         due_date: { type: "string", description: "Updated ISO 8601 due date" },
         priority: { type: "string", enum: ["low", "medium", "high"] },
+        goal_id: {
+          type: "string",
+          description:
+            "Link or re-link this task to a goal UUID. Pass null to unlink.",
+        },
       },
       required: ["task_id"],
     },
@@ -261,6 +281,96 @@ export const tools: Anthropic.Tool[] = [
     },
     cache_control: { type: "ephemeral" },
   },
+  {
+    name: "create_goal",
+    description:
+      "Create a new goal. Use when the user defines a high-level objective they want to track over time.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: "Short, outcome-oriented goal title",
+        },
+        status: {
+          type: "string",
+          enum: ["on_track", "at_risk", "stalled"],
+          description: "Initial health status. Defaults to 'on_track'.",
+        },
+        status_note: {
+          type: "string",
+          description: "Optional note explaining the current status",
+        },
+        progress: {
+          type: "number",
+          description: "Completion percentage 0–100. Defaults to 0.",
+        },
+        target_date: {
+          type: "string",
+          description: "ISO 8601 target completion date, if mentioned",
+        },
+      },
+      required: ["title"],
+    },
+  },
+  {
+    name: "list_goals",
+    description:
+      "Retrieve all goals, optionally filtered by status. Use when the user asks for a goal overview or progress update.",
+    input_schema: {
+      type: "object",
+      properties: {
+        status: {
+          type: "string",
+          enum: ["on_track", "at_risk", "stalled"],
+          description: "Filter by health status. Omit to return all goals.",
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "update_goal",
+    description:
+      "Update a goal's status, progress, or note. Use when the user reports progress, changes a goal's health, or updates its target date. Call list_goals first if you don't have the goal_id.",
+    input_schema: {
+      type: "object",
+      properties: {
+        goal_id: { type: "string", description: "UUID of the goal to update" },
+        title: { type: "string", description: "Updated goal title" },
+        status: {
+          type: "string",
+          enum: ["on_track", "at_risk", "stalled"],
+          description: "Updated health status",
+        },
+        status_note: {
+          type: "string",
+          description: "Updated status note. Pass null to clear.",
+        },
+        progress: {
+          type: "number",
+          description: "Updated completion percentage 0–100",
+        },
+        target_date: {
+          type: "string",
+          description: "Updated target date. Pass null to clear.",
+        },
+      },
+      required: ["goal_id"],
+    },
+  },
+  {
+    name: "delete_goal",
+    description:
+      "Delete a goal. Use only when the user explicitly asks to remove a goal. Linked tasks will have their goal_id cleared but will not be deleted. Call list_goals first if you don't have the goal_id.",
+    input_schema: {
+      type: "object",
+      properties: {
+        goal_id: { type: "string", description: "UUID of the goal to delete" },
+      },
+      required: ["goal_id"],
+    },
+  },
 ];
 
 export async function dispatchTool(
@@ -289,6 +399,14 @@ export async function dispatchTool(
         return await upsertContact(supabase, userId, input as never);
       case "update_context":
         return await updateContext(supabase, userId, input as never);
+      case "create_goal":
+        return await createGoal(supabase, userId, input as never);
+      case "list_goals":
+        return { goals: await listGoals(supabase, userId, input as never) };
+      case "update_goal":
+        return await updateGoal(supabase, userId, input as never);
+      case "delete_goal":
+        return await deleteGoal(supabase, userId, input.goal_id as string);
       default:
         return { error: `Unknown tool: ${toolName}` };
     }
