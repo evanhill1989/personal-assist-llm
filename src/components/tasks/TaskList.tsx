@@ -63,13 +63,26 @@ interface Props {
   tasks: TaskRow[];
   goals: GoalRow[];
   createTaskAction: (formData: FormData) => Promise<void>;
+  completeTaskAction: (taskId: string) => Promise<void>;
 }
 
-export function TaskList({ tasks, goals, createTaskAction }: Props) {
+export function TaskList({
+  tasks,
+  goals,
+  createTaskAction,
+  completeTaskAction,
+}: Props) {
   const groups = groupTasks(tasks);
   const goalMap = Object.fromEntries(goals.map((g) => [g.id, g.title]));
   const [showAdd, setShowAdd] = useState(false);
-  const [isPending, startTransition] = useTransition();
+  const [isAddPending, startAddTransition] = useTransition();
+  const [completingId, setCompletingId] = useState<string | null>(null);
+
+  async function handleComplete(taskId: string) {
+    setCompletingId(taskId);
+    await completeTaskAction(taskId);
+    setCompletingId(null);
+  }
 
   return (
     <div className="space-y-8">
@@ -86,24 +99,63 @@ export function TaskList({ tasks, goals, createTaskAction }: Props) {
           </p>
           <div className="space-y-1.5">
             {groupTasks.map((task) => (
-              <Link
+              <div
                 key={task.id}
-                href={`/tasks/${task.id}`}
-                className="flex items-center gap-3 rounded-lg border border-neutral-200 bg-white px-4 py-3 text-sm transition-colors hover:bg-neutral-50"
+                className="flex items-center rounded-lg border border-neutral-200 bg-white text-sm transition-colors hover:bg-neutral-50"
               >
-                <span
-                  className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                    PRIORITY_DOT[task.priority ?? "low"]
-                  }`}
-                />
-                <span className="flex-1 text-neutral-900">{task.title}</span>
-                {(task.goal_id && goalMap[task.goal_id]) || task.project ? (
-                  <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500">
-                    {task.goal_id ? goalMap[task.goal_id] : task.project}
-                  </span>
-                ) : null}
-                <span className="text-neutral-300">›</span>
-              </Link>
+                <Link
+                  href={`/tasks/${task.id}`}
+                  className="flex flex-1 items-center gap-3 px-4 py-3"
+                >
+                  <span
+                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                      PRIORITY_DOT[task.priority ?? "low"]
+                    }`}
+                  />
+                  <span className="flex-1 text-neutral-900">{task.title}</span>
+                  {(task.goal_id && goalMap[task.goal_id]) || task.project ? (
+                    <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500">
+                      {task.goal_id ? goalMap[task.goal_id] : task.project}
+                    </span>
+                  ) : null}
+                  <span className="text-neutral-300">›</span>
+                </Link>
+                <button
+                  type="button"
+                  disabled={completingId === task.id}
+                  onClick={() => handleComplete(task.id)}
+                  aria-label="Mark complete"
+                  className="flex items-center px-4 py-3 text-neutral-300 transition-colors hover:text-green-500 disabled:opacity-40"
+                >
+                  {completingId === task.id ? (
+                    <span className="block h-3.5 w-3.5 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-500" />
+                  ) : (
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 16 16"
+                      fill="currentColor"
+                      className="h-3.5 w-3.5"
+                    >
+                      <circle
+                        cx="8"
+                        cy="8"
+                        r="7"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                      />
+                      <path
+                        d="M5 8l2 2 4-4"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        fill="none"
+                      />
+                    </svg>
+                  )}
+                </button>
+              </div>
             ))}
           </div>
         </div>
@@ -112,7 +164,7 @@ export function TaskList({ tasks, goals, createTaskAction }: Props) {
       {showAdd ? (
         <form
           action={(formData) => {
-            startTransition(async () => {
+            startAddTransition(async () => {
               await createTaskAction(formData);
               setShowAdd(false);
             });
@@ -156,10 +208,10 @@ export function TaskList({ tasks, goals, createTaskAction }: Props) {
           <div className="flex gap-2">
             <button
               type="submit"
-              disabled={isPending}
+              disabled={isAddPending}
               className="rounded-md bg-neutral-900 px-4 py-2 text-sm text-white transition-opacity disabled:opacity-50"
             >
-              {isPending ? "Adding…" : "Add task"}
+              {isAddPending ? "Adding…" : "Add task"}
             </button>
             <button
               type="button"

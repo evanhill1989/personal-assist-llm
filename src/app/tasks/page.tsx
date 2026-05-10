@@ -5,7 +5,7 @@ import {
 import { listTasks } from "@/lib/supabase/queries/tasks";
 import { listGoals } from "@/lib/supabase/queries/goals";
 import { TaskList } from "@/components/tasks/TaskList";
-import { createTaskAction } from "./actions";
+import { createTaskAction, completeTaskAction } from "./actions";
 
 export default async function TasksPage() {
   const supabase = createServerSupabaseClient();
@@ -20,6 +20,7 @@ export default async function TasksPage() {
         tasks={tasks}
         goals={goals}
         createTaskAction={createTaskAction}
+        completeTaskAction={completeTaskAction}
       />
     </div>
   );

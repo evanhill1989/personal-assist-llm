@@ -94,7 +94,13 @@ export function NotesView({ notes, createCaptureAction }: Props) {
             rows={3}
             placeholder="Dump a thought…"
             className="w-full resize-none bg-transparent text-sm text-neutral-900 outline-none placeholder:text-neutral-400"
+            onInput={(e) => {
+              const el = e.currentTarget;
+              el.style.height = "auto";
+              el.style.height = `${el.scrollHeight}px`;
+            }}
           />
+
           <div className="mt-2 flex justify-end">
             <button
               type="submit"
