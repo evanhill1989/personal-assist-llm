@@ -108,11 +108,20 @@ export function TaskList({
                   className="flex flex-1 items-center gap-3 px-4 py-3"
                 >
                   <span
-                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                      PRIORITY_DOT[task.priority ?? "low"]
-                    }`}
+                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${PRIORITY_DOT[task.priority ?? "low"]}`}
                   />
                   <span className="flex-1 text-neutral-900">{task.title}</span>
+                  {task.category && (
+                    <span
+                      className={`rounded px-2 py-0.5 text-xs font-medium ${
+                        task.category === "work"
+                          ? "bg-blue-50 text-blue-700"
+                          : "bg-emerald-50 text-emerald-700"
+                      }`}
+                    >
+                      {task.category}
+                    </span>
+                  )}
                   {(task.goal_id && goalMap[task.goal_id]) || task.project ? (
                     <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500">
                       {task.goal_id ? goalMap[task.goal_id] : task.project}
@@ -133,7 +142,6 @@ export function TaskList({
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       viewBox="0 0 16 16"
-                      fill="currentColor"
                       className="h-3.5 w-3.5"
                     >
                       <circle
@@ -178,7 +186,7 @@ export function TaskList({
             required
             className="w-full rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-900 outline-none placeholder:text-neutral-400 focus:border-neutral-400"
           />
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <select
               name="priority"
               className="rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-600"
@@ -187,6 +195,14 @@ export function TaskList({
               <option value="high">High</option>
               <option value="medium">Medium</option>
               <option value="low">Low</option>
+            </select>
+            <select
+              name="category"
+              className="rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-600"
+            >
+              <option value="">Category</option>
+              <option value="work">Work</option>
+              <option value="personal">Personal</option>
             </select>
             <input
               name="due_date"

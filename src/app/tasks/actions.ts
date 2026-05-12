@@ -11,7 +11,7 @@ import {
 } from "@/lib/supabase/queries/tasks";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import type { TaskPriority } from "@/types/tools";
+import type { TaskPriority, TaskCategory } from "@/types/tools";
 
 export async function createTaskAction(formData: FormData): Promise<void> {
   const title = (formData.get("title") as string).trim();
@@ -23,6 +23,7 @@ export async function createTaskAction(formData: FormData): Promise<void> {
     priority: (formData.get("priority") as TaskPriority) || undefined,
     due_date: (formData.get("due_date") as string) || undefined,
     goal_id: (formData.get("goal_id") as string) || undefined,
+    category: (formData.get("category") as TaskCategory) || undefined,
   });
   revalidatePath("/tasks");
 }
@@ -32,6 +33,7 @@ export async function updateTaskAction(
   formData: FormData,
 ): Promise<void> {
   const supabase = createServerSupabaseClient();
+  const category = formData.get("category") as string;
   await updateTask(supabase, SOLO_USER_ID, {
     task_id: taskId,
     title: (formData.get("title") as string).trim(),
@@ -39,6 +41,7 @@ export async function updateTaskAction(
     priority: (formData.get("priority") as TaskPriority) || undefined,
     due_date: (formData.get("due_date") as string) || undefined,
     goal_id: (formData.get("goal_id") as string) || null,
+    category: category ? (category as TaskCategory) : null,
   });
   revalidatePath("/tasks");
   revalidatePath(`/tasks/${taskId}`);

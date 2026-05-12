@@ -1,7 +1,6 @@
 "use client";
 
 import { useTransition } from "react";
-
 import type { TaskRow, GoalRow } from "@/types/supabase";
 
 interface Props {
@@ -63,15 +62,30 @@ export function TaskDetailForm({
 
           <div>
             <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-neutral-400">
-              Due date
+              Category
             </label>
-            <input
-              name="due_date"
-              type="date"
-              defaultValue={task.due_date ?? ""}
+            <select
+              name="category"
+              defaultValue={task.category ?? ""}
               className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-neutral-400"
-            />
+            >
+              <option value="">None</option>
+              <option value="work">Work</option>
+              <option value="personal">Personal</option>
+            </select>
           </div>
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-xs font-medium uppercase tracking-widest text-neutral-400">
+            Due date
+          </label>
+          <input
+            name="due_date"
+            type="date"
+            defaultValue={task.due_date ?? ""}
+            className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-neutral-400"
+          />
         </div>
 
         <div>

@@ -1,5 +1,6 @@
 export type TaskStatus = "open" | "completed";
 export type TaskPriority = "low" | "medium" | "high";
+export type TaskCategory = "work" | "personal";
 export type GoalStatus = "on_track" | "at_risk" | "stalled";
 export type ContextField =
   | "current_priorities"
@@ -16,6 +17,7 @@ export interface CreateTaskInput {
   project?: string;
   contact_name?: string;
   goal_id?: string;
+  category?: TaskCategory;
 }
 
 export interface ListTasksInput {
@@ -36,166 +38,7 @@ export interface UpdateTaskInput {
   due_date?: string;
   priority?: TaskPriority;
   goal_id?: string | null;
-}
-
-export interface DeleteTaskInput {
-  task_id: string;
-}
-
-export interface CreateNoteInput {
-  title: string;
-  body: string;
-  tags?: string[];
-  related_project?: string;
-  contact_name?: string;
-}
-
-export interface SearchNotesInput {
-  query?: string;
-  tags?: string[];
-  related_project?: string;
-  contact_name?: string;
-  limit?: number;
-}
-
-export interface DeleteNoteInput {
-  note_id: string;
-}
-
-export interface UpsertContactInput {
-  name: string;
-  relationship?: string;
-  email?: string;
-  company?: string;
-  notes?: string;
-  last_contacted?: string;
-}
-
-export interface UpdateContextInput {
-  field: ContextField;
-  value: string;
-  append?: boolean;
-}
-
-export interface CreateGoalInput {
-  title: string;
-  status?: GoalStatus;
-  status_note?: string;
-  progress?: number;
-  target_date?: string;
-}
-
-export interface ListGoalsInput {
-  status?: GoalStatus;
-}
-
-export interface UpdateGoalInput {
-  goal_id: string;
-  title?: string;
-  status?: GoalStatus;
-  status_note?: string | null;
-  progress?: number;
-  target_date?: string | null;
-}
-
-export interface DeleteGoalInput {
-  goal_id: string;
-}
-
-export interface CreateTaskInput {
-  title: string;
-  description?: string;
-  due_date?: string;
-  priority?: TaskPriority;
-  project?: string;
-  contact_name?: string;
-}
-
-export interface ListTasksInput {
-  status?: TaskStatus | "all";
-  priority?: TaskPriority;
-  project?: string;
-  due_before?: string;
-  contact_name?: string;
-  limit?: number;
-}
-
-export interface UpdateTaskInput {
-  task_id: string;
-  title?: string;
-  description?: string;
-  status?: TaskStatus;
-  due_date?: string;
-  priority?: TaskPriority;
-}
-
-export interface DeleteTaskInput {
-  task_id: string;
-}
-
-export interface CreateNoteInput {
-  title: string;
-  body: string;
-  tags?: string[];
-  related_project?: string;
-  contact_name?: string;
-}
-
-export interface SearchNotesInput {
-  query?: string;
-  tags?: string[];
-  related_project?: string;
-  contact_name?: string;
-  limit?: number;
-}
-
-export interface DeleteNoteInput {
-  note_id: string;
-}
-
-export interface UpsertContactInput {
-  name: string;
-  relationship?: string;
-  email?: string;
-  company?: string;
-  notes?: string;
-  last_contacted?: string;
-}
-
-export interface UpdateContextInput {
-  field: ContextField;
-  value: string;
-  append?: boolean;
-}
-
-export interface CreateTaskInput {
-  title: string;
-  description?: string;
-  due_date?: string;
-  priority?: TaskPriority;
-  project?: string;
-  contact_name?: string;
-  goal_id?: string;
-}
-
-export interface ListTasksInput {
-  status?: TaskStatus | "all";
-  priority?: TaskPriority;
-  project?: string;
-  due_before?: string;
-  contact_name?: string;
-  goal_id?: string;
-  limit?: number;
-}
-
-export interface UpdateTaskInput {
-  task_id: string;
-  title?: string;
-  description?: string;
-  status?: TaskStatus;
-  due_date?: string;
-  priority?: TaskPriority;
-  goal_id?: string | null;
+  category?: TaskCategory | null;
 }
 
 export interface DeleteTaskInput {
