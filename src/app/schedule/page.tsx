@@ -8,6 +8,8 @@ import { DailyScheduler } from "@/components/schedule/DailyScheduler";
 import {
   createSingleBlockAction,
   createPomodoroBlockAction,
+  createTaskAndScheduleAction,
+  createTaskAndAddToBlockAction,
   addTaskToBlockAction,
   removeTaskFromBlockAction,
   deleteBlockAction,
@@ -30,6 +32,8 @@ export default async function SchedulePage() {
         date={today}
         createSingleBlockAction={createSingleBlockAction}
         createPomodoroBlockAction={createPomodoroBlockAction}
+        createTaskAndScheduleAction={createTaskAndScheduleAction}
+        createTaskAndAddToBlockAction={createTaskAndAddToBlockAction}
         addTaskToBlockAction={addTaskToBlockAction}
         removeTaskFromBlockAction={removeTaskFromBlockAction}
         deleteBlockAction={deleteBlockAction}

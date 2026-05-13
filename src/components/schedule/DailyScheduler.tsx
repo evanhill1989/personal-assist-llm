@@ -59,6 +59,12 @@ function formatTime(hhmm: string): string {
   return `${h12}:${String(m).padStart(2, "0")} ${period}`;
 }
 
+interface NewTaskFields {
+  title: string;
+  category: string;
+  priority: string;
+}
+
 interface Props {
   tasks: TaskRow[];
   blocks: ScheduleBlockWithTasks[];
@@ -75,6 +81,16 @@ interface Props {
     endTime: string,
     label: string,
   ) => Promise<void>;
+  createTaskAndScheduleAction: (
+    date: string,
+    startTime: string,
+    endTime: string,
+    taskInput: NewTaskFields,
+  ) => Promise<void>;
+  createTaskAndAddToBlockAction: (
+    blockId: string,
+    taskInput: NewTaskFields,
+  ) => Promise<void>;
   addTaskToBlockAction: (blockId: string, taskId: string) => Promise<void>;
   removeTaskFromBlockAction: (blockId: string, taskId: string) => Promise<void>;
   deleteBlockAction: (blockId: string) => Promise<void>;
@@ -86,6 +102,8 @@ export function DailyScheduler({
   date,
   createSingleBlockAction,
   createPomodoroBlockAction,
+  createTaskAndScheduleAction,
+  createTaskAndAddToBlockAction,
   addTaskToBlockAction,
   removeTaskFromBlockAction,
   deleteBlockAction,
@@ -100,6 +118,11 @@ export function DailyScheduler({
   const [createLabel, setCreateLabel] = useState("");
   const [addingToBlockId, setAddingToBlockId] = useState<string | null>(null);
   const [addTaskId, setAddTaskId] = useState("");
+  const [newTask, setNewTask] = useState<NewTaskFields>({
+    title: "",
+    category: "",
+    priority: "",
+  });
   const [isPending, startTransition] = useTransition();
 
   const taskMap = Object.fromEntries(tasks.map((t) => [t.id, t]));
@@ -123,6 +146,10 @@ export function DailyScheduler({
     }
   }
 
+  function resetNewTask() {
+    setNewTask({ title: "", category: "", priority: "" });
+  }
+
   function cancelCreate() {
     setCreatingAt(null);
     setCreateMode(null);
@@ -130,19 +157,26 @@ export function DailyScheduler({
     setCreateLabel("");
     setCreateDuration(25);
     setCreateSingleDuration(30);
+    resetNewTask();
   }
 
   function handleCreateSingle() {
-    if (!creatingAt || !createTaskId) return;
-    startTransition(async () => {
-      await createSingleBlockAction(
-        date,
-        creatingAt,
-        addMinutes(creatingAt, createSingleDuration),
-        createTaskId,
-      );
-      cancelCreate();
-    });
+    if (!creatingAt) return;
+    const endTime = addMinutes(creatingAt, createSingleDuration);
+
+    if (createTaskId === "__new__") {
+      if (!newTask.title.trim()) return;
+      startTransition(async () => {
+        await createTaskAndScheduleAction(date, creatingAt, endTime, newTask);
+        cancelCreate();
+      });
+    } else {
+      if (!createTaskId) return;
+      startTransition(async () => {
+        await createSingleBlockAction(date, creatingAt, endTime, createTaskId);
+        cancelCreate();
+      });
+    }
   }
 
   function handleCreatePomodoro() {
@@ -159,12 +193,74 @@ export function DailyScheduler({
   }
 
   function handleAddTaskToBlock() {
-    if (!addingToBlockId || !addTaskId) return;
-    startTransition(async () => {
-      await addTaskToBlockAction(addingToBlockId, addTaskId);
-      setAddingToBlockId(null);
-      setAddTaskId("");
-    });
+    if (!addingToBlockId) return;
+
+    if (addTaskId === "__new__") {
+      if (!newTask.title.trim()) return;
+      startTransition(async () => {
+        await createTaskAndAddToBlockAction(addingToBlockId, newTask);
+        setAddingToBlockId(null);
+        setAddTaskId("");
+        resetNewTask();
+      });
+    } else {
+      if (!addTaskId) return;
+      startTransition(async () => {
+        await addTaskToBlockAction(addingToBlockId, addTaskId);
+        setAddingToBlockId(null);
+        setAddTaskId("");
+      });
+    }
+  }
+
+  function NewTaskForm() {
+    return (
+      <div className="space-y-2">
+        <input
+          value={newTask.title}
+          onChange={(e) => setNewTask((p) => ({ ...p, title: e.target.value }))}
+          placeholder="Task title"
+          autoFocus
+          className="w-full rounded border border-neutral-200 bg-neutral-50 px-2 py-1.5 text-xs text-neutral-700 outline-none placeholder:text-neutral-400 focus:border-neutral-400"
+        />
+        <div className="flex gap-1.5">
+          {(["work", "personal"] as const).map((cat) => (
+            <button
+              key={cat}
+              type="button"
+              onClick={() =>
+                setNewTask((p) => ({
+                  ...p,
+                  category: p.category === cat ? "" : cat,
+                }))
+              }
+              className={[
+                "rounded px-2.5 py-1 text-xs capitalize transition-colors",
+                newTask.category === cat
+                  ? cat === "work"
+                    ? "bg-blue-600 text-white"
+                    : "bg-emerald-600 text-white"
+                  : "border border-neutral-200 text-neutral-600 hover:bg-neutral-50",
+              ].join(" ")}
+            >
+              {cat}
+            </button>
+          ))}
+          <select
+            value={newTask.priority}
+            onChange={(e) =>
+              setNewTask((p) => ({ ...p, priority: e.target.value }))
+            }
+            className="rounded border border-neutral-200 bg-neutral-50 px-2 py-1 text-xs text-neutral-600"
+          >
+            <option value="">Priority</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
+      </div>
+    );
   }
 
   function renderSlotGroup(slots: string[]) {
@@ -250,11 +346,14 @@ export function DailyScheduler({
               {isPomodoro && (
                 <div className="mt-2">
                   {addingToBlockId === block.id ? (
-                    <div className="flex gap-1.5">
+                    <div className="space-y-2">
                       <select
                         value={addTaskId}
-                        onChange={(e) => setAddTaskId(e.target.value)}
-                        className="flex-1 rounded border border-indigo-200 bg-white px-2 py-1 text-xs text-neutral-700"
+                        onChange={(e) => {
+                          setAddTaskId(e.target.value);
+                          if (e.target.value !== "__new__") resetNewTask();
+                        }}
+                        className="w-full rounded border border-indigo-200 bg-white px-2 py-1 text-xs text-neutral-700"
                       >
                         <option value="">Pick a task…</option>
                         {availableToAdd.map((t) => (
@@ -262,23 +361,33 @@ export function DailyScheduler({
                             {t.title}
                           </option>
                         ))}
+                        <option value="__new__">+ New task…</option>
                       </select>
-                      <button
-                        onClick={handleAddTaskToBlock}
-                        disabled={!addTaskId || isPending}
-                        className="rounded bg-indigo-600 px-2 py-1 text-xs text-white disabled:opacity-40"
-                      >
-                        Add
-                      </button>
-                      <button
-                        onClick={() => {
-                          setAddingToBlockId(null);
-                          setAddTaskId("");
-                        }}
-                        className="rounded border border-neutral-200 px-2 py-1 text-xs text-neutral-400 hover:text-neutral-600"
-                      >
-                        ✕
-                      </button>
+                      {addTaskId === "__new__" && <NewTaskForm />}
+                      <div className="flex gap-1.5">
+                        <button
+                          onClick={handleAddTaskToBlock}
+                          disabled={
+                            !addTaskId ||
+                            (addTaskId === "__new__" &&
+                              !newTask.title.trim()) ||
+                            isPending
+                          }
+                          className="rounded bg-indigo-600 px-2 py-1 text-xs text-white disabled:opacity-40"
+                        >
+                          {addTaskId === "__new__" ? "Create & Add" : "Add"}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setAddingToBlockId(null);
+                            setAddTaskId("");
+                            resetNewTask();
+                          }}
+                          className="rounded border border-neutral-200 px-2 py-1 text-xs text-neutral-400 hover:text-neutral-600"
+                        >
+                          ✕
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <button
@@ -350,7 +459,10 @@ export function DailyScheduler({
                     </div>
                     <select
                       value={createTaskId}
-                      onChange={(e) => setCreateTaskId(e.target.value)}
+                      onChange={(e) => {
+                        setCreateTaskId(e.target.value);
+                        if (e.target.value !== "__new__") resetNewTask();
+                      }}
                       className="w-full rounded border border-neutral-200 bg-neutral-50 px-2 py-1.5 text-xs text-neutral-700"
                     >
                       <option value="">Pick a task…</option>
@@ -359,14 +471,23 @@ export function DailyScheduler({
                           {t.title}
                         </option>
                       ))}
+                      <option value="__new__">+ New task…</option>
                     </select>
+                    {createTaskId === "__new__" && <NewTaskForm />}
                     <div className="flex gap-2">
                       <button
                         onClick={handleCreateSingle}
-                        disabled={!createTaskId || isPending}
+                        disabled={
+                          !createTaskId ||
+                          (createTaskId === "__new__" &&
+                            !newTask.title.trim()) ||
+                          isPending
+                        }
                         className="rounded bg-neutral-900 px-3 py-1 text-xs text-white disabled:opacity-40"
                       >
-                        Schedule
+                        {createTaskId === "__new__"
+                          ? "Create & Schedule"
+                          : "Schedule"}
                       </button>
                       <button
                         onClick={cancelCreate}
