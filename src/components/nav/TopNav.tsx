@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { label: "Calendar", href: "/calendar" },
   { label: "Goals", href: "/goals" },
   { label: "Notes", href: "/notes" },
+  { label: "Mindmap", href: "/mindmap" },
 ];
 
 export function TopNav() {

@@ -73,3 +73,20 @@ export interface ScheduleBlockTaskRow {
   task_id: string;
   created_at: string;
 }
+
+export interface MindMapRow {
+  id: string;
+  user_id: string;
+  title: string;
+  created_at: string;
+}
+
+export interface MindMapNodeRow {
+  id: string;
+  map_id: string;
+  parent_node_id: string | null;
+  label: string;
+  task_id: string | null;
+  node_type: "label" | "task";
+  created_at: string;
+}
