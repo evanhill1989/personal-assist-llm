@@ -22,6 +22,7 @@ interface LayoutNode {
   children: LayoutNode[];
   color: string;
   depth: number;
+  labelYOffset: number;
 }
 
 // ---- Constants ----
@@ -54,6 +55,7 @@ function buildTree(nodes: MindMapNodeRow[]): LayoutNode | null {
       children: [],
       color: "#94a3b8",
       depth: 0,
+      labelYOffset: 0,
     });
   }
   let root: LayoutNode | undefined;
@@ -127,6 +129,32 @@ function collectEdges(
   ]);
 }
 
+const SIN_70 = Math.sin((70 * Math.PI) / 180); // ≈ 0.940 — threshold for ±20° of vertical
+
+function applyLabelOffsets(flat: LayoutNode[]): void {
+  const byId = new Map<string, LayoutNode>();
+  for (const n of flat) byId.set(n.id, n);
+
+  for (const node of flat) {
+    if (node.depth === 0 || !node.parentId) {
+      node.labelYOffset = 0;
+      continue;
+    }
+    const parent = byId.get(node.parentId);
+    if (!parent) {
+      node.labelYOffset = 0;
+      continue;
+    }
+    const angle = Math.atan2(node.y - parent.y, node.x - parent.x);
+    if (Math.abs(Math.sin(angle)) > SIN_70) {
+      const dx = node.x - parent.x;
+      node.labelYOffset = Math.abs(dx) > 5 ? (dx > 0 ? 14 : -14) : 0;
+    } else {
+      node.labelYOffset = 0;
+    }
+  }
+}
+
 function computeLayout(nodes: MindMapNodeRow[]): {
   flat: LayoutNode[];
   edges: Array<{ parent: LayoutNode; child: LayoutNode }>;
@@ -135,7 +163,9 @@ function computeLayout(nodes: MindMapNodeRow[]): {
   if (!root) return { flat: [], edges: [] };
   applyLayout(root, 0, 0, -Math.PI, 2 * Math.PI, 0);
   assignColors(root, "#94a3b8");
-  return { flat: flattenTree(root), edges: collectEdges(root) };
+  const flat = flattenTree(root);
+  applyLabelOffsets(flat);
+  return { flat, edges: collectEdges(root) };
 }
 
 // ---- Component ----
@@ -156,6 +186,7 @@ export function MindMapCanvas({ mapId, nodes, tasks }: Props) {
   const [containerSize, setContainerSize] = useState({ w: 800, h: 600 });
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isDraggingActive, setIsDraggingActive] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -182,13 +213,14 @@ export function MindMapCanvas({ mapId, nodes, tasks }: Props) {
   useEffect(() => {
     if (!pendingFocusId) return;
     const node = layoutNodes.find((n) => n.id === pendingFocusId);
-    if (node) {
+    if (!node) return;
+    startTransition(() => {
       setSelectedId(pendingFocusId);
       setEditingId(pendingFocusId);
       setEditValue(node.label);
       setPendingFocusId(null);
-    }
-  }, [layoutNodes, pendingFocusId]);
+    });
+  }, [layoutNodes, pendingFocusId, startTransition]);
 
   // Focus edit input
   useEffect(() => {
@@ -217,6 +249,7 @@ export function MindMapCanvas({ mapId, nodes, tasks }: Props) {
       if (target.closest("[data-node-id]")) return;
       isDragging.current = true;
       hasDragged.current = false;
+      setIsDraggingActive(true);
       dragStart.current = {
         x: e.clientX,
         y: e.clientY,
@@ -237,6 +270,7 @@ export function MindMapCanvas({ mapId, nodes, tasks }: Props) {
 
   const onMouseUp = useCallback(() => {
     isDragging.current = false;
+    setIsDraggingActive(false);
   }, []);
 
   function getScreenPos(node: LayoutNode) {
@@ -300,7 +334,7 @@ export function MindMapCanvas({ mapId, nodes, tasks }: Props) {
     >
       <svg
         className="absolute inset-0 h-full w-full"
-        style={{ cursor: isDragging.current ? "grabbing" : "grab" }}
+        style={{ cursor: isDraggingActive ? "grabbing" : "grab" }}
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
@@ -331,16 +365,11 @@ export function MindMapCanvas({ mapId, nodes, tasks }: Props) {
             );
           })}
 
+          {/* Pass 1: circles — rendered first so labels always paint on top */}
           {layoutNodes.map((node) => {
             const isRoot = node.depth === 0;
             const isSelected = node.id === selectedId;
             const r = isRoot ? 32 : 24;
-            const maxChars = isRoot ? 12 : 10;
-            const display =
-              node.label.length > maxChars
-                ? node.label.slice(0, maxChars - 1) + "…"
-                : node.label;
-
             return (
               <g
                 key={node.id}
@@ -363,7 +392,7 @@ export function MindMapCanvas({ mapId, nodes, tasks }: Props) {
                   r={r}
                   fill={isRoot ? "#1e293b" : "white"}
                   stroke={isSelected ? "#6366f1" : node.color}
-                  strokeWidth={isSelected ? 2.5 : 1.5}
+                  strokeWidth={isSelected ? 3 : 1.5}
                 />
                 {node.nodeType === "task" && (
                   <circle
@@ -373,16 +402,61 @@ export function MindMapCanvas({ mapId, nodes, tasks }: Props) {
                     fill="#60a5fa"
                   />
                 )}
+              </g>
+            );
+          })}
+
+          {/* Pass 2: non-selected labels first, selected label last — paint order = z-index */}
+          {[
+            ...layoutNodes.filter((n) => n.id !== selectedId),
+            ...layoutNodes.filter((n) => n.id === selectedId),
+          ].map((node) => {
+            const isRoot = node.depth === 0;
+            const isSelected = node.id === selectedId;
+            if (isRoot) {
+              return (
                 <text
+                  key={`lbl-${node.id}`}
                   x={node.x}
                   y={node.y}
                   textAnchor="middle"
                   dominantBaseline="middle"
-                  fontSize={isRoot ? 12 : 10}
-                  fill={isRoot ? "white" : "#374151"}
+                  fontSize={11}
+                  fontWeight="500"
+                  fill="white"
+                  fontFamily="var(--font-dm-sans), sans-serif"
                   style={{ pointerEvents: "none", userSelect: "none" }}
                 >
-                  {display}
+                  {node.label}
+                </text>
+              );
+            }
+            const estWidth = Math.max(node.label.length * 5.8, 28);
+            const ly = node.y + node.labelYOffset;
+            return (
+              <g key={`lbl-${node.id}`} style={{ pointerEvents: "none" }}>
+                <rect
+                  x={node.x - estWidth / 2 - 4}
+                  y={ly - 8}
+                  width={estWidth + 8}
+                  height={16}
+                  fill={isSelected ? "#eef2ff" : "white"}
+                  stroke={isSelected ? "#6366f1" : "none"}
+                  strokeWidth={isSelected ? 1 : 0}
+                  rx={2}
+                />
+                <text
+                  x={node.x}
+                  y={ly}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fontSize={10}
+                  fill={isSelected ? "#1e293b" : "#374151"}
+                  fontWeight={isSelected ? "500" : "normal"}
+                  fontFamily="var(--font-dm-sans), sans-serif"
+                  style={{ userSelect: "none" }}
+                >
+                  {node.label}
                 </text>
               </g>
             );
@@ -409,9 +483,9 @@ export function MindMapCanvas({ mapId, nodes, tasks }: Props) {
               onBlur={commitEdit}
               style={{
                 position: "absolute",
-                left: pos.left - 64,
+                left: pos.left - 80,
                 top: pos.top - 13,
-                width: 128,
+                width: 160,
                 zIndex: 10,
               }}
               className="rounded border border-indigo-400 bg-white px-2 py-1 text-xs text-neutral-900 shadow outline-none"
